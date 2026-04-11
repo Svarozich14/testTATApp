@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '../../../shared/hooks/storeHooks'
 import { selectSelectedDestination } from '../model/geoAutocomplete.selectors'
 import { geoAutocompleteActions } from '../model/geoAutocomplete.slice'
-import type { GeoEntity, GeoEntityType } from '../model/geoAutocomplete.types'
+import { GeoEntityTypes, type GeoEntity, type GeoEntityType } from '../model/geoAutocomplete.types'
+import { CountryLoadStatuses } from '../../../entities/country/model/country.types'
 import { fetchCountries } from '../../../entities/country/model/country.slice'
 import {
   selectCountriesList,
@@ -15,8 +16,8 @@ import { readJson, readRejectedResponse } from '../../../shared/api/parse'
 type GeoResponse = Record<string, GeoEntity>
 
 function iconFor(type: GeoEntityType) {
-  if (type === 'country') return '🌍'
-  if (type === 'city') return '🏙️'
+  if (type === GeoEntityTypes.Country) return '🌍'
+  if (type === GeoEntityTypes.City) return '🏙️'
   return '🏨'
 }
 
@@ -51,7 +52,7 @@ export function GeoInput() {
       countries.map((c) => ({
         key: `country:${c.id}`,
         label: c.name,
-        leading: <span aria-hidden="true">{iconFor('country')}</span>,
+        leading: <span aria-hidden="true">{iconFor(GeoEntityTypes.Country)}</span>,
         meta: c.flag ? <img src={c.flag} alt="" width={18} height={12} /> : undefined,
       })),
     [countries]
@@ -103,7 +104,7 @@ export function GeoInput() {
 
     // Spec: if a country was selected and the user re-opens the input (no typing yet),
     // show the base countries list, not searchGeo results.
-    if (selected?.type === 'country' && !editedSinceOpen) return 'countries'
+    if (selected?.type === GeoEntityTypes.Country && !editedSinceOpen) return 'countries'
 
     return 'search'
   }, [query, selected?.type, editedSinceOpen])
@@ -118,7 +119,7 @@ export function GeoInput() {
     //   - if selected is country -> show countries
     //   - if selected is city/hotel -> show search results for entered value
     if (mode === 'countries') {
-      if (countriesStatus === 'idle') dispatch(fetchCountries())
+      if (countriesStatus === CountryLoadStatuses.Idle) dispatch(fetchCountries())
       return
     }
 
@@ -128,7 +129,7 @@ export function GeoInput() {
   }, [open, mode, query, countriesStatus, dispatch, runSearch])
 
   const items = mode === 'countries' ? countryItems : searchItems
-  const loading = mode === 'countries' ? countriesStatus === 'loading' : searchLoading
+  const loading = mode === 'countries' ? countriesStatus === CountryLoadStatuses.Loading : searchLoading
   const errorText = mode === 'countries' ? null : searchErrorText
 
   return (
@@ -139,7 +140,7 @@ export function GeoInput() {
       onOpenChange={(next) => {
         setOpen(next)
         if (next) setEditedSinceOpen(false)
-        if (next && countriesStatus === 'idle') dispatch(fetchCountries())
+        if (next && countriesStatus === CountryLoadStatuses.Idle) dispatch(fetchCountries())
       }}
       query={query}
       onQueryChange={(q) => {

@@ -1,4 +1,10 @@
-export type GeoEntityType = 'country' | 'city' | 'hotel'
+export const GeoEntityTypes = {
+  Country: 'country',
+  City: 'city',
+  Hotel: 'hotel',
+} as const
+
+export type GeoEntityType = (typeof GeoEntityTypes)[keyof typeof GeoEntityTypes]
 
 export type GeoEntity = {
   id: string | number
@@ -13,4 +19,3 @@ export type SelectedDestination = {
   type: GeoEntityType
   label: string
 }
-
