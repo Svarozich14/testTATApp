@@ -4,6 +4,7 @@ export const SearchFlowStatuses = {
   Polling: 'polling',
   Success: 'success',
   Error: 'error',
+  Cancelling: 'cancelling'
 } as const
 
 export type SearchFlowStatus = (typeof SearchFlowStatuses)[keyof typeof SearchFlowStatuses]

@@ -45,6 +45,9 @@ const searchSlice = createSlice({
   name: 'search',
   initialState,
   reducers: {
+    cancelSearch(state) {
+      state.status = SearchFlowStatuses.Cancelling
+    },
     submitSearch: {
       prepare: (destination: SelectedDestination) => ({
         payload: { destination, sessionId: nextSessionId() },
@@ -53,7 +56,6 @@ const searchSlice = createSlice({
         state.sessionId = action.payload.sessionId
         state.status = SearchFlowStatuses.Loading
         state.error = null
-        state.token = null
         state.waitUntil = null
         state.results = null
         state.criteriaKey = null

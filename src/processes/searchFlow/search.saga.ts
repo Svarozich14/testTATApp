@@ -1,6 +1,7 @@
 import { all, call, delay, put, select, takeLatest } from 'redux-saga/effects'
 import type { RootState } from '../../app/store'
 import {
+  // stopSearchPrices, server side cancel
   getSearchPricesWithRetry,
   startSearchPricesWithRetry,
   transientExhaustedMessage,
@@ -107,6 +108,17 @@ function* runPricesSearch(
 }
 
 function* submitWorker(action: ReturnType<typeof searchActions.submitSearch>) {
+  const state = (yield select((s: RootState) => s.search)) as RootState['search']
+  const prevToken = state.token
+  if (prevToken) {
+    try {
+      yield put(searchActions.cancelSearch())
+      // yield call(stopSearchPrices, prevToken)
+    } catch (e) {
+      // ignore cancel error
+    }
+  }
+
   const { destination, sessionId } = action.payload
 
   const resolved = (yield call(resolveSearchCountryId, destination)) as ResolveCountryIdResult
