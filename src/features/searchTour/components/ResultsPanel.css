@@ -1,0 +1,37 @@
+.results-panel {
+  width: 700px;
+  max-width: 100%;
+  margin: 16px auto 0;
+  padding: 25px;
+}
+
+.results-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.results-panel__state {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(47, 109, 255, 0.08);
+  color: #1e3a5f;
+}
+
+.results-panel__error {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(185, 28, 28, 0.08);
+  color: #7f1d1d;
+}
+
+/* 700 - 2*25 padding = 650 content; to keep card >=250, single column below 516 */
+@media (max-width: 516px) {
+  .results-panel {
+    padding: 16px;
+  }
+
+  .results-panel__grid {
+    grid-template-columns: 1fr;
+  }
+}

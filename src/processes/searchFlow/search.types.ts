@@ -1,10 +1,13 @@
-import type { GeoEntityType } from '../../features/geoAutocomplete/model/geoAutocomplete.types'
+import type { SelectedDestination } from '../../features/geoAutocomplete/model/geoAutocomplete.types'
 
 export type SearchDestinationRef = {
   id: string | number
-  type: GeoEntityType
+  type: SelectedDestination['type']
 }
 
-export function makeSearchCriteriaKey(countryId: string, destination: SearchDestinationRef): string {
-  return `${countryId}:${destination.type}:${destination.id}`
+export function makeSearchCriteriaKey(
+  countryId: string,
+  destination: SearchDestinationRef
+): string {
+  return `${countryId}:${destination.type}:${String(destination.id)}`
 }

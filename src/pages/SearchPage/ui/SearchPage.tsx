@@ -1,5 +1,6 @@
 import { useAppDispatch, useAppSelector } from '../../../shared/hooks/storeHooks'
 import { SearchForm } from '../../../features/searchTour/ui/SearchForm'
+import ResultsPanel from '../../../features/searchTour/components/ResultsPanel'
 import { searchActions } from '../../../processes/searchFlow/search.slice'
 import {
   selectSearchError,
@@ -23,6 +24,7 @@ export function SearchPage() {
         resultsEmpty={resultsEmpty}
         onStartSearch={(destination) => dispatch(searchActions.submitSearch(destination))}
       />
+      <ResultsPanel />
     </main>
   )
 }

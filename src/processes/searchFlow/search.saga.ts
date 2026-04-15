@@ -1,4 +1,4 @@
-import { call, delay, put, select, takeLatest } from 'redux-saga/effects'
+import { all, call, delay, put, select, takeLatest } from 'redux-saga/effects'
 import type { RootState } from '../../app/store'
 import {
   getSearchPricesWithRetry,
@@ -6,54 +6,60 @@ import {
   transientExhaustedMessage,
   type SearchPricesMap,
 } from '../../shared/api/searchPrices.service'
+import { getHotelsByCountry } from '../../shared/api/hotels.service'
 import { resolveSearchCountryId, type ResolveCountryIdResult } from './resolveSearchCountryId'
 import { searchActions } from './search.slice'
 import { makeSearchCriteriaKey } from './search.types'
 
-function* submitWorker(action: ReturnType<typeof searchActions.submitSearch>) {
-  const { destination, sessionId } = action.payload
+const HOTELS_CACHE_TTL_MS = 60 * 60 * 1000
 
-  const resolved = (yield call(resolveSearchCountryId, destination)) as ResolveCountryIdResult
-  if (resolved.ok === false) {
-    const sid = (yield select((s: RootState) => s.search.sessionId)) as string | null
-    if (sid === sessionId) {
-      yield put(searchActions.searchFailed({ sessionId, message: resolved.error }))
-    }
-    return
+function* isSessionActual(sessionId: string) {
+  const sid = (yield select((s: RootState) => s.search.sessionId)) as string | null
+  return sid === sessionId
+}
+
+function* ensureHotelsLoaded(sessionId: string, countryId: string) {
+  yield put(
+    searchActions.pruneExpiredHotelsCache({ now: Date.now(), ttl: HOTELS_CACHE_TTL_MS })
+  )
+
+  const state = (yield select((s: RootState) => s.search)) as RootState['search']
+  const cacheEntry = state.hotelsCache[countryId]
+  if (cacheEntry?.status === 'success') return
+
+  if (!(yield* isSessionActual(sessionId))) return
+  yield put(searchActions.fetchHotelsRequest(countryId))
+
+  try {
+    const hotels = (yield call(getHotelsByCountry, countryId)) as Awaited<
+      ReturnType<typeof getHotelsByCountry>
+    >
+    if (!(yield* isSessionActual(sessionId))) return
+    yield put(searchActions.fetchHotelsSuccess({ countryId, data: hotels }))
+  } catch (e) {
+    if (!(yield* isSessionActual(sessionId))) return
+    yield put(searchActions.fetchHotelsFailure({ countryId, error: transientExhaustedMessage(e) }))
   }
+}
 
-  const { countryId } = resolved
-  const criteriaKey = makeSearchCriteriaKey(countryId, destination)
-
-  const cached = (yield select((s: RootState) => s.search.cache[criteriaKey])) as
-    | SearchPricesMap
-    | undefined
-  if (cached) {
-    const sid = (yield select((s: RootState) => s.search.sessionId)) as string | null
-    if (sid === sessionId) {
-      yield put(searchActions.searchFromCache({ sessionId, criteriaKey, results: cached }))
-    }
-    return
-  }
-
+function* runPricesSearch(
+  sessionId: string,
+  countryId: string,
+  criteriaKey: string
+) {
   let start: Awaited<ReturnType<typeof startSearchPricesWithRetry>>
   try {
     start = (yield call(startSearchPricesWithRetry, countryId)) as Awaited<
       ReturnType<typeof startSearchPricesWithRetry>
     >
   } catch (e) {
-    const sid = (yield select((s: RootState) => s.search.sessionId)) as string | null
-    if (sid === sessionId) {
-      yield put(
-        searchActions.searchFailed({ sessionId, message: transientExhaustedMessage(e) })
-      )
+    if (yield* isSessionActual(sessionId)) {
+      yield put(searchActions.searchFailed({ sessionId, message: transientExhaustedMessage(e) }))
     }
     return
   }
 
-  let sid = (yield select((s: RootState) => s.search.sessionId)) as string | null
-  if (sid !== sessionId) return
-
+  if (!(yield* isSessionActual(sessionId))) return
   yield put(
     searchActions.searchAwaitingPoll({
       sessionId,
@@ -71,24 +77,21 @@ function* submitWorker(action: ReturnType<typeof searchActions.submitSearch>) {
     if (ms > 0) {
       yield delay(ms)
     }
-    sid = (yield select((s: RootState) => s.search.sessionId)) as string | null
-    if (sid !== sessionId) return
+    if (!(yield* isSessionActual(sessionId))) return
 
     let poll: Awaited<ReturnType<typeof getSearchPricesWithRetry>>
     try {
-      poll = (yield call(getSearchPricesWithRetry, token)) as Awaited<ReturnType<typeof getSearchPricesWithRetry>>
+      poll = (yield call(getSearchPricesWithRetry, token)) as Awaited<
+        ReturnType<typeof getSearchPricesWithRetry>
+      >
     } catch (e) {
-      sid = (yield select((s: RootState) => s.search.sessionId)) as string | null
-      if (sid === sessionId) {
-        yield put(
-          searchActions.searchFailed({ sessionId, message: transientExhaustedMessage(e) })
-        )
+      if (yield* isSessionActual(sessionId)) {
+        yield put(searchActions.searchFailed({ sessionId, message: transientExhaustedMessage(e) }))
       }
       return
     }
 
-    sid = (yield select((s: RootState) => s.search.sessionId)) as string | null
-    if (sid !== sessionId) return
+    if (!(yield* isSessionActual(sessionId))) return
 
     if (poll.kind === 'not_ready') {
       waitUntil = poll.waitUntil
@@ -101,6 +104,42 @@ function* submitWorker(action: ReturnType<typeof searchActions.submitSearch>) {
     yield put(searchActions.searchSucceeded({ sessionId, criteriaKey, results: poll.prices }))
     return
   }
+}
+
+function* submitWorker(action: ReturnType<typeof searchActions.submitSearch>) {
+  const { destination, sessionId } = action.payload
+
+  const resolved = (yield call(resolveSearchCountryId, destination)) as ResolveCountryIdResult
+  if (resolved.ok === false) {
+    if (yield* isSessionActual(sessionId)) {
+      yield put(searchActions.searchFailed({ sessionId, message: resolved.error }))
+    }
+    return
+  }
+
+  const { countryId } = resolved
+  if (!(yield* isSessionActual(sessionId))) return
+  yield put(searchActions.setResolvedCountryId(countryId))
+
+  const criteriaKey = makeSearchCriteriaKey(countryId, destination)
+
+  const cached = (yield select((s: RootState) => s.search.cache[criteriaKey])) as
+    | SearchPricesMap
+    | undefined
+  if (cached) {
+    // Keep loading state until hotel cache is ready to avoid success/loading flicker.
+    yield call(ensureHotelsLoaded, sessionId, countryId)
+    if (!(yield* isSessionActual(sessionId))) return
+    if (yield* isSessionActual(sessionId)) {
+      yield put(searchActions.searchFromCache({ sessionId, criteriaKey, results: cached }))
+    }
+    return
+  }
+
+  yield all([
+    call(ensureHotelsLoaded, sessionId, countryId),
+    call(runPricesSearch, sessionId, countryId, criteriaKey),
+  ])
 }
 
 export function* searchFlowSaga() {
