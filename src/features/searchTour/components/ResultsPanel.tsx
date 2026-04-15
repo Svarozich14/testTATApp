@@ -51,10 +51,12 @@ export default function ResultsPanel() {
               country={result.country}
               city={result.city}
               startDate={result.startDate}
+              endDate={result.endDate}
               amount={result.amount}
               currency={result.currency}
               imageUrl={result.hotelImg}
               priceId={result.priceId}
+              hotelId={result.hotelId}
             />
           ))}
         </div>

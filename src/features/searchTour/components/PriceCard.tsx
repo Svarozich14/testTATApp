@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { formatDisplayAmount, formatDisplayDate } from '../../../shared/lib/formatters'
 import './PriceCard.css'
 
 type PriceCardProps = {
@@ -6,23 +7,12 @@ type PriceCardProps = {
   country: string
   city: string
   startDate: string
+  endDate: string
   amount: number
   currency: string
   imageUrl: string
   priceId: string
-}
-
-function formatDate(dateIso: string): string {
-  const date = new Date(dateIso)
-  return new Intl.DateTimeFormat('uk-UA').format(date)
-}
-
-function formatAmount(amount: number, currency: string): string {
-  const formatted = new Intl.NumberFormat('uk-UA', {
-    maximumFractionDigits: 0,
-  }).format(amount)
-  const cur = currency.toLowerCase() === 'usd' ? 'USD' : currency.toUpperCase()
-  return `${formatted} ${cur}`
+  hotelId: string
 }
 
 export default function PriceCard({
@@ -30,11 +20,16 @@ export default function PriceCard({
   country,
   city,
   startDate,
+  endDate,
   amount,
   currency,
   imageUrl,
   priceId,
+  hotelId,
 }: PriceCardProps) {
+  const canOpenDetails = hotelId.trim().length > 0
+  const tourPath = `/tour/${priceId}/${hotelId}`
+
   return (
     <article className="price-card">
       <div className="price-card__image-wrap">
@@ -42,11 +37,29 @@ export default function PriceCard({
       </div>
       <h3 className="price-card__title">{hotelName}</h3>
       <p className="price-card__meta">{country}{city ? `, ${city}` : ''}</p>
-      <p className="price-card__meta">Початок туру: {formatDate(startDate)}</p>
-      <p className="price-card__price">{formatAmount(amount, currency)}</p>
-      <Link className="price-card__link" to={`/tour/${priceId}`}>
-        Відкрити ціну
-      </Link>
+      <p className="price-card__meta">Початок туру: {formatDisplayDate(startDate)}</p>
+      <p className="price-card__price">{formatDisplayAmount(amount, currency)}</p>
+      {canOpenDetails ? (
+        <Link
+          className="price-card__link"
+          to={tourPath}
+          state={{
+            priceSnapshot: {
+              id: priceId,
+              amount,
+              currency,
+              startDate,
+              endDate,
+            },
+          }}
+        >
+          Відкрити ціну
+        </Link>
+      ) : (
+        <span className="price-card__link" aria-disabled="true" title="Немає даних для переходу">
+          Відкрити ціну
+        </span>
+      )}
     </article>
   )
 }

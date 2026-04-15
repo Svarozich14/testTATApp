@@ -3,6 +3,7 @@ import type { HotelsMap } from '../../../shared/api/hotels.service'
 
 export interface MergedResult {
   priceId: string
+  hotelId: string
   amount: number
   currency: string
   startDate: string
@@ -18,6 +19,7 @@ export function mergeResults(prices: SearchPricesMap, hotels: HotelsMap): Merged
     const hotel = hotels[String(price.hotelID)]
     return {
       priceId: price.id,
+      hotelId: String(price.hotelID ?? ''),
       amount: price.amount,
       currency: price.currency,
       startDate: price.startDate,
